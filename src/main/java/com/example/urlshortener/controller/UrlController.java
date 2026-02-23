@@ -1,8 +1,11 @@
 package com.example.urlshortener.controller;
 
+import com.example.urlshortener.dto.ShortenRequest;
 import com.example.urlshortener.entity.UrlMapping;
 import com.example.urlshortener.service.UrlService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -17,27 +20,35 @@ public class UrlController {
         this.service = service;
     }
 
-    // CREATE SHORT URL (SIMPLE)
+    // =========================
+    // CREATE SHORT URL
+    // =========================
     @PostMapping("/api/shorten")
-    public Map<String, String> shorten(@RequestBody Map<String, String> request) {
-        UrlMapping url = service.shortenUrl(request.get("originalUrl"));
-        return Map.of(
-                "shortUrl", "http://localhost:8081/" + url.getShortCode()
-        );
+    public ResponseEntity<Map<String, String>> shorten(
+            @RequestBody ShortenRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        UrlMapping mapping = service.createShortUrl(request.getOriginalUrl());
+
+        // Dynamically build base URL (works for localhost & Railway)
+        String baseUrl = httpRequest.getRequestURL()
+                .toString()
+                .replace(httpRequest.getRequestURI(), "");
+
+        String shortUrl = baseUrl + "/" + mapping.getShortCode();
+
+        return ResponseEntity.ok(Map.of("shortUrl", shortUrl));
     }
 
-    // REDIRECT
-    @GetMapping("/{shortCode}")
-    public void redirect(@PathVariable String shortCode,
-                         HttpServletResponse response) throws IOException {
-
-        UrlMapping url = service.getAndUpdate(shortCode);
-        response.sendRedirect(url.getOriginalUrl());
-    }
-
-    // ANALYTICS
-    @GetMapping("/api/analytics/{shortCode}")
-    public UrlMapping analytics(@PathVariable String shortCode) {
-        return service.getAnalytics(shortCode);
+    // =========================
+    // REDIRECT SHORT URL
+    // =========================
+    @GetMapping("/{code}")
+    public void redirect(
+            @PathVariable String code,
+            HttpServletResponse response
+    ) throws IOException {
+        String originalUrl = service.getOriginalUrl(code);
+        response.sendRedirect(originalUrl);
     }
 }
